@@ -1,5 +1,9 @@
 [default]
 domain = "example.com"
+generate_sitemap = true
+generate_llms = true
+generate_rss = true
+generate_robots = true
 
 [llms]
 prefix = """# Welcome to example.com.

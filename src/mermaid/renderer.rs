@@ -13,8 +13,8 @@
 
 use std::collections::HashMap;
 
-use super::shim::{Modifier, Style};
 use super::shim::{Line, Span};
+use super::shim::{Modifier, Style};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Theme-derived styles used when painting a diagram.
@@ -1454,9 +1454,7 @@ impl Canvas {
         }
         self.mask[i] |= bits;
         self.style[i] |= self.cur_style;
-        if self.cls[i] != Cls::Border {
-            self.cls[i] = Cls::Edge;
-        }
+        self.cls[i] = Cls::Edge;
     }
 
     fn blit(&mut self, sub: &Canvas, ox: usize, oy: usize) {
@@ -1482,9 +1480,7 @@ impl Canvas {
         }
         let i = self.idx(x, y);
         self.mask[i] |= bits;
-        if self.cls[i] != Cls::Border {
-            self.cls[i] = Cls::Edge;
-        }
+        self.cls[i] = Cls::Edge;
     }
 
     fn seg_v(&mut self, x: usize, y0: usize, y1: usize) {
@@ -2723,10 +2719,10 @@ fn draw_box(canvas: &mut Canvas, p: &Placed, lines: &[String], shape: Shape) {
         Shape::Round | Shape::Diamond => ('╭', '╮', '╰', '╯'),
         Shape::Rect => ('┌', '┐', '└', '┘'),
     };
-    canvas.set(x, y, tl, Cls::Border);
-    canvas.set(right, y, tr, Cls::Border);
-    canvas.set(x, bottom, bl, Cls::Border);
-    canvas.set(right, bottom, br, Cls::Border);
+    canvas.set(x, y, tl, Cls::Edge);
+    canvas.set(right, y, tr, Cls::Edge);
+    canvas.set(x, bottom, bl, Cls::Edge);
+    canvas.set(right, bottom, br, Cls::Edge);
 
     for cx in (x + 1)..right {
         canvas.add_bits(cx, y, L | R);

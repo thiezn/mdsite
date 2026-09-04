@@ -93,14 +93,26 @@ mod tests {
     fn renders_classed_html() {
         let out = render_html("graph LR\n  A[a & b] -->|go| C{c}", Some(120)).unwrap();
         assert!(
-            out.contains("<span class=\"b\">"),
-            "missing border span:\n{out}"
+            out.contains("<span class=\"e\">"),
+            "missing edge span:\n{out}"
         );
         assert!(
             out.contains("<span class=\"el\">"),
             "missing edge label span:\n{out}"
         );
         assert!(out.contains("a &amp; b"), "unescaped ampersand:\n{out}");
+    }
+
+    #[test]
+    fn styles_box_corners_as_edges() {
+        let out = render_html("graph TD\n  A[Start] --> B[End]", Some(120)).unwrap();
+        for corner in ['┌', '┐', '└', '┘'] {
+            assert!(out.contains(corner), "missing box corner {corner}:\n{out}");
+        }
+        assert!(
+            !out.contains("<span class=\"b\">"),
+            "box corners must not use the border style:\n{out}"
+        );
     }
 
     #[test]

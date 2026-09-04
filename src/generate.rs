@@ -17,6 +17,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 struct SiteConfig {
     domain: String,
     llms_prefix: Option<String>,
+    generate_sitemap: bool,
+    generate_llms: bool,
+    generate_rss: bool,
+    generate_robots: bool,
 }
 
 struct PageMetadata {
@@ -58,6 +62,7 @@ pub fn build(input: &Path, output: &Path) -> Result<()> {
         }
         fs::copy(asset.absolute, destination)?;
     }
+    generate_robots(input, output, &config)?;
     fs::write(output.join("style.css"), STYLE_CSS)?;
     let mut syntax_stylesheets = BTreeSet::new();
     for file in &files {
@@ -76,9 +81,9 @@ pub fn build(input: &Path, output: &Path) -> Result<()> {
     }
 
     for file in &files {
-        convert_file(file, output)?;
+        convert_file(file, output, config.generate_rss)?;
     }
-    let directory_pages = generate_directory_pages(&files, output)?;
+    let directory_pages = generate_directory_pages(&files, output, config.generate_rss)?;
     generate_site_metadata(&files, &directory_pages, output, &config)?;
     Ok(())
 }
@@ -86,10 +91,10 @@ pub fn build(input: &Path, output: &Path) -> Result<()> {
 fn read_config(input: &Path) -> Result<SiteConfig> {
     let config_path = input.join("mdsite.toml");
     if !config_path.exists() {
-        return Ok(SiteConfig {
-            domain: String::new(),
-            llms_prefix: None,
-        });
+        return Err(crate::error::Error::Other(format!(
+            "missing required site configuration: {}",
+            config_path.display()
+        )));
     }
     let config = fs::read_to_string(&config_path).map_err(|error| {
         crate::error::Error::Other(format!("read {}: {error}", config_path.display()))
@@ -118,6 +123,11 @@ fn read_config(input: &Path) -> Result<SiteConfig> {
         .and_then(|section| section.get("prefix"))
         .and_then(toml::Value::as_str)
         .map(str::to_owned);
+    let default_section = value.get("default").and_then(toml::Value::as_table);
+    let generate_sitemap = config_boolean(default_section, "generate_sitemap");
+    let generate_llms = config_boolean(default_section, "generate_llms");
+    let generate_rss = config_boolean(default_section, "generate_rss");
+    let generate_robots = config_boolean(default_section, "generate_robots");
 
     let domain = if domain.starts_with("http://") || domain.starts_with("https://") {
         domain
@@ -128,10 +138,34 @@ fn read_config(input: &Path) -> Result<SiteConfig> {
     Ok(SiteConfig {
         domain,
         llms_prefix,
+        generate_sitemap,
+        generate_llms,
+        generate_rss,
+        generate_robots,
     })
 }
 
-fn convert_file(file: &MdFile, output_root: &Path) -> Result<()> {
+fn config_boolean(section: Option<&toml::map::Map<String, toml::Value>>, key: &str) -> bool {
+    section
+        .and_then(|section| section.get(key))
+        .and_then(toml::Value::as_bool)
+        .unwrap_or(true)
+}
+
+fn generate_robots(input: &Path, output: &Path, config: &SiteConfig) -> Result<()> {
+    if !config.generate_robots || input.join("robots.txt").is_file() {
+        return Ok(());
+    }
+
+    let mut robots = String::from("User-agent: *\nAllow: /\n");
+    if config.generate_sitemap {
+        robots.push_str(&format!("\nSitemap: {}/sitemap.xml\n", config.domain));
+    }
+    fs::write(output.join("robots.txt"), robots)?;
+    Ok(())
+}
+
+fn convert_file(file: &MdFile, output_root: &Path, include_rss_link: bool) -> Result<()> {
     let md_bytes = fs::read(&file.absolute)?;
     let md_text = String::from_utf8(md_bytes)?;
     let parsed = frontmatter::parse(&md_text);
@@ -190,6 +224,7 @@ fn convert_file(file: &MdFile, output_root: &Path) -> Result<()> {
         parsed.language.as_deref(),
         parsed.publish_date.as_deref(),
         parsed.last_updated_at.as_deref(),
+        include_rss_link.then(|| css::relative_asset_href(&html_rel, "rss.xml")),
     );
 
     let html_path = output_root.join(&html_rel);
@@ -205,7 +240,11 @@ fn convert_file(file: &MdFile, output_root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_directory_pages(files: &[MdFile], output_root: &Path) -> Result<Vec<PathBuf>> {
+fn generate_directory_pages(
+    files: &[MdFile],
+    output_root: &Path,
+    include_rss_link: bool,
+) -> Result<Vec<PathBuf>> {
     let mut files_by_directory = BTreeMap::<_, Vec<_>>::new();
     let mut generated_pages = Vec::new();
     for file in files {
@@ -255,7 +294,16 @@ fn generate_directory_pages(files: &[MdFile], output_root: &Path) -> Result<Vec<
         let md_rel = directory.with_extension("md");
         let md_href = md_rel.file_name().and_then(|name| name.to_str());
         let page = html::render_page(
-            &title, &body, &css_hrefs, md_href, &html_rel, None, None, None, None,
+            &title,
+            &body,
+            &css_hrefs,
+            md_href,
+            &html_rel,
+            None,
+            None,
+            None,
+            None,
+            include_rss_link.then(|| css::relative_asset_href(&html_rel, "rss.xml")),
         );
         fs::write(output_root.join(html_rel), page)?;
         fs::write(output_root.join(md_rel), markdown)?;
@@ -291,10 +339,10 @@ fn generate_site_metadata(
     markdown_pages.sort();
 
     let date = generation_date()?;
-    let mut sitemap = String::from(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://sitemaps.org\">\n",
-    );
-    if !config.domain.is_empty() {
+    if config.generate_sitemap {
+        let mut sitemap = String::from(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://sitemaps.org\">\n",
+        );
         for markdown_page in &markdown_pages {
             let metadata = source_metadata.get(markdown_page);
             if metadata.is_some_and(|metadata| !metadata.include_in_sitemap) {
@@ -311,84 +359,88 @@ fn generate_site_metadata(
                 "  <url>\n    <loc>{location}</loc>\n    <lastmod>{last_modified}</lastmod>\n  </url>\n"
             ));
         }
+        sitemap.push_str("</urlset>\n");
+        fs::write(output_root.join("sitemap.xml"), sitemap)?;
     }
-    sitemap.push_str("</urlset>\n");
-    fs::write(output_root.join("sitemap.xml"), sitemap)?;
 
-    let mut llms = String::from(
-        "[Full site content](llms-full.txt): A full dump of every page on this site in one file.\n\n",
-    );
-    if let Some(prefix) = &config.llms_prefix {
-        llms.push_str(prefix);
-        if !prefix.ends_with('\n') {
+    if config.generate_llms {
+        let mut llms = String::from(
+            "[Full site content](llms-full.txt): A full dump of every page on this site in one file.\n\n",
+        );
+        if let Some(prefix) = &config.llms_prefix {
+            llms.push_str(prefix);
+            if !prefix.ends_with('\n') {
+                llms.push('\n');
+            }
             llms.push('\n');
         }
-        llms.push('\n');
-    }
-    for markdown_page in &markdown_pages {
-        let path = markdown_page.to_string_lossy().replace('\\', "/");
-        llms.push_str(&format!("- [{path}]({path})\n"));
-    }
-    fs::write(output_root.join("llms.txt"), llms)?;
+        for markdown_page in &markdown_pages {
+            let path = markdown_page.to_string_lossy().replace('\\', "/");
+            llms.push_str(&format!("- [{path}]({path})\n"));
+        }
+        fs::write(output_root.join("llms.txt"), llms)?;
 
-    let mut llms_full = String::new();
-    for markdown_page in &markdown_pages {
-        let markdown = fs::read_to_string(output_root.join(markdown_page))?;
-        llms_full.push_str(&markdown);
-        if !markdown.ends_with('\n') {
+        let mut llms_full = String::new();
+        for markdown_page in &markdown_pages {
+            let markdown = fs::read_to_string(output_root.join(markdown_page))?;
+            llms_full.push_str(&markdown);
+            if !markdown.ends_with('\n') {
+                llms_full.push('\n');
+            }
             llms_full.push('\n');
         }
-        llms_full.push('\n');
+        fs::write(output_root.join("llms-full.txt"), llms_full)?;
     }
-    fs::write(output_root.join("llms-full.txt"), llms_full)?;
 
-    let home_metadata = source_metadata.get(Path::new("index.md"));
-    let feed_title = home_metadata
-        .and_then(|metadata| metadata.title.as_deref())
-        .unwrap_or(&config.domain);
-    let feed_description = home_metadata
-        .and_then(|metadata| metadata.description.as_deref())
-        .unwrap_or("RSS feed");
-    let feed_language = home_metadata
-        .and_then(|metadata| metadata.language.as_deref())
-        .unwrap_or("en");
-    let items = files
-        .iter()
-        .filter_map(|file| {
-            let metadata = source_metadata.get(&file.relative)?;
-            metadata.include_in_rss.then_some(rss::Item {
-                title: metadata.title.as_deref().unwrap_or_else(|| {
-                    file.relative
-                        .file_stem()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("page")
-                }),
-                description: metadata.description.as_deref(),
-                language: metadata.language.as_deref(),
-                link: page_url(
-                    &config.domain,
-                    &file
-                        .relative
-                        .with_extension("html")
-                        .to_string_lossy()
-                        .replace('\\', "/"),
-                ),
-                publish_date: metadata.publish_date.as_deref(),
-                last_updated_at: metadata.last_updated_at.as_deref(),
+    if config.generate_rss {
+        let home_metadata = source_metadata.get(Path::new("index.md"));
+        let feed_title = home_metadata
+            .and_then(|metadata| metadata.title.as_deref())
+            .unwrap_or(&config.domain);
+        let feed_description = home_metadata
+            .and_then(|metadata| metadata.description.as_deref())
+            .unwrap_or("RSS feed");
+        let feed_language = home_metadata
+            .and_then(|metadata| metadata.language.as_deref())
+            .unwrap_or("en");
+        let items = files
+            .iter()
+            .filter_map(|file| {
+                let metadata = source_metadata.get(&file.relative)?;
+                metadata.include_in_rss.then_some(rss::Item {
+                    title: metadata.title.as_deref().unwrap_or_else(|| {
+                        file.relative
+                            .file_stem()
+                            .and_then(|name| name.to_str())
+                            .unwrap_or("page")
+                    }),
+                    description: metadata.description.as_deref(),
+                    language: metadata.language.as_deref(),
+                    link: page_url(
+                        &config.domain,
+                        &file
+                            .relative
+                            .with_extension("html")
+                            .to_string_lossy()
+                            .replace('\\', "/"),
+                    ),
+                    publish_date: metadata.publish_date.as_deref(),
+                    last_updated_at: metadata.last_updated_at.as_deref(),
+                })
             })
-        })
-        .collect();
-    fs::write(
-        output_root.join("rss.xml"),
-        rss::generate(rss::Feed {
-            title: feed_title,
-            description: feed_description,
-            language: feed_language,
-            link: &config.domain,
-            build_date: &date,
-            items,
-        }),
-    )?;
+            .collect();
+        fs::write(
+            output_root.join("rss.xml"),
+            rss::generate(rss::Feed {
+                title: feed_title,
+                description: feed_description,
+                language: feed_language,
+                link: &config.domain,
+                build_date: &date,
+                items,
+            }),
+        )?;
+    }
     Ok(())
 }
 
@@ -407,9 +459,7 @@ fn page_metadata(file: &MdFile) -> Result<PageMetadata> {
 }
 
 fn page_url(domain: &str, path: &str) -> String {
-    if domain.is_empty() {
-        path.to_owned()
-    } else if path == "index.html" {
+    if path == "index.html" {
         domain.to_owned()
     } else {
         format!("{domain}/{path}")
@@ -449,6 +499,14 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    fn write_config(input: &Path) {
+        fs::write(
+            input.join("mdsite.toml"),
+            "[default]\ndomain = \"example.com\"\n",
+        )
+        .unwrap();
+    }
+
     #[test]
     fn build_basic_site_without_mermaid() {
         let input = tempfile::tempdir().unwrap();
@@ -464,6 +522,7 @@ mod tests {
             "## Nested\n\n[home](../index.md)\n",
         )
         .unwrap();
+        write_config(input.path());
 
         build(input.path(), output.path()).unwrap();
 
@@ -491,6 +550,7 @@ mod tests {
         let input = tempfile::tempdir().unwrap();
         let output = tempfile::tempdir().unwrap();
         fs::write(input.path().join("index.md"), "# Current site\n").unwrap();
+        write_config(input.path());
         fs::write(output.path().join("old.html"), "stale page").unwrap();
         fs::create_dir_all(output.path().join("old/nested")).unwrap();
         fs::write(output.path().join("old/nested/file.txt"), "stale file").unwrap();
@@ -511,6 +571,7 @@ mod tests {
         fs::write(input.path().join("index.md"), "# Home\n").unwrap();
         fs::write(input.path().join("robots.txt"), "User-agent: *\n").unwrap();
         fs::write(input.path().join("images/icons/logo.png"), [0, 1, 2, 255]).unwrap();
+        write_config(input.path());
 
         build(input.path(), output.path()).unwrap();
 
@@ -577,7 +638,7 @@ mod tests {
         let home = fs::read_to_string(output.path().join("index.html")).unwrap();
         assert!(home.contains("<html lang=\"en\">"));
         assert!(home.contains("<meta name=\"description\" content=\"Home page\">"));
-        assert!(home.contains("Published <time datetime=\"2026-01-02\">2026-01-02</time>"));
+        assert!(home.contains("published <time datetime=\"2026-01-02\">2026-01-02</time>"));
 
         let rss = fs::read_to_string(output.path().join("rss.xml")).unwrap();
         assert!(rss.contains("<title>Home</title>"));
@@ -586,6 +647,78 @@ mod tests {
         assert!(rss.contains("<pubDate>Wed, 04 Mar 2026 00:00:00 GMT</pubDate>"));
         assert!(!rss.contains("https://example.com/guides/hidden.html"));
         assert!(!output.path().join("mdsite.toml").exists());
+    }
+
+    #[test]
+    fn build_respects_disabled_metadata_generators() {
+        let input = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        fs::write(input.path().join("index.md"), "# Home\n").unwrap();
+        fs::write(
+            input.path().join("mdsite.toml"),
+            "[default]\ndomain = \"example.com\"\ngenerate_sitemap = false\ngenerate_llms = false\ngenerate_rss = false\n",
+        )
+        .unwrap();
+
+        build(input.path(), output.path()).unwrap();
+
+        assert!(!output.path().join("sitemap.xml").exists());
+        assert!(!output.path().join("llms.txt").exists());
+        assert!(!output.path().join("llms-full.txt").exists());
+        assert!(!output.path().join("rss.xml").exists());
+        let index = fs::read_to_string(output.path().join("index.html")).unwrap();
+        assert!(!index.contains("application/rss+xml"));
+    }
+
+    #[test]
+    fn build_generates_default_robots_with_optional_sitemap() {
+        let input = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        fs::write(input.path().join("index.md"), "# Home\n").unwrap();
+        write_config(input.path());
+
+        build(input.path(), output.path()).unwrap();
+        assert_eq!(
+            fs::read_to_string(output.path().join("robots.txt")).unwrap(),
+            "User-agent: *\nAllow: /\n\nSitemap: https://example.com/sitemap.xml\n"
+        );
+
+        fs::write(
+            input.path().join("mdsite.toml"),
+            "[default]\ndomain = \"example.com\"\ngenerate_sitemap = false\n",
+        )
+        .unwrap();
+        build(input.path(), output.path()).unwrap();
+        assert_eq!(
+            fs::read_to_string(output.path().join("robots.txt")).unwrap(),
+            "User-agent: *\nAllow: /\n"
+        );
+    }
+
+    #[test]
+    fn build_preserves_input_robots_and_requires_configuration() {
+        let input = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        fs::write(input.path().join("index.md"), "# Home\n").unwrap();
+        fs::write(
+            input.path().join("robots.txt"),
+            "User-agent: Example\nDisallow: /\n",
+        )
+        .unwrap();
+
+        let error = build(input.path(), output.path()).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("missing required site configuration")
+        );
+
+        write_config(input.path());
+        build(input.path(), output.path()).unwrap();
+        assert_eq!(
+            fs::read_to_string(output.path().join("robots.txt")).unwrap(),
+            "User-agent: Example\nDisallow: /\n"
+        );
     }
 
     #[test]
@@ -610,13 +743,14 @@ mod tests {
             "# Diagram\n\n```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n",
         )
         .unwrap();
+        write_config(input.path());
 
         build(input.path(), output.path()).unwrap();
 
         let index = fs::read_to_string(output.path().join("index.html")).unwrap();
         assert!(index.contains("<pre class=\"mermaid\">"));
         assert!(index.contains("Start"));
-        assert!(index.contains("class=\"b\""));
+        assert!(index.contains("class=\"e\""));
         assert!(!index.contains("-mermaid-1.svg"));
         assert!(!output.path().join("index-mermaid-1.svg").exists());
     }
@@ -630,6 +764,7 @@ mod tests {
             "# Code\n\n```rust\nfn main() {}\n```\n\n```python\nprint('hello')\n```\n",
         )
         .unwrap();
+        write_config(input.path());
 
         build(input.path(), output.path()).unwrap();
 
@@ -656,6 +791,7 @@ mod tests {
         fs::write(input.path().join("project_notes/faq.md"), "Questions.\n").unwrap();
         fs::write(input.path().join("custom/item.md"), "Custom item.\n").unwrap();
         fs::write(input.path().join("custom.md"), "# Custom landing page\n").unwrap();
+        write_config(input.path());
         fs::create_dir_all(output.path().join("project_notes")).unwrap();
         fs::write(
             output.path().join("project_notes/index.html"),

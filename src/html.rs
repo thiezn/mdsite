@@ -11,6 +11,7 @@ pub fn render_page(
     language: Option<&str>,
     publish_date: Option<&str>,
     last_updated_at: Option<&str>,
+    rss_href: Option<String>,
 ) -> String {
     let title_esc = escape_text(title);
     let language = language.unwrap_or("en");
@@ -39,6 +40,12 @@ pub fn render_page(
             escape_text(&href)
         )
     });
+    let rss_alternate = rss_href.map_or_else(String::new, |href| {
+        format!(
+            "<link rel=\"alternate\" type=\"application/rss+xml\" href=\"{}\" title=\"RSS Feed\">",
+            escape_text(&href)
+        )
+    });
     let breadcrumbs = breadcrumb_html(page_rel);
     let markdown_source = md_href.map_or_else(String::new, |href| {
         format!(
@@ -57,6 +64,7 @@ pub fn render_page(
 {description}
 {stylesheets}
 {markdown_alternate}
+{rss_alternate}
 </head>
 <body>
 <header>
@@ -75,6 +83,7 @@ pub fn render_page(
         description = description,
         stylesheets = stylesheets,
         markdown_alternate = markdown_alternate,
+        rss_alternate = rss_alternate,
         breadcrumbs = breadcrumbs,
         markdown_source = markdown_source,
         body = body_html,
@@ -178,6 +187,7 @@ mod tests {
             Some("nl"),
             Some("2026-01-02"),
             Some("2026-03-04"),
+            Some("../rss.xml".to_owned()),
         );
         assert!(html.contains("href=\"../style.css\""));
         assert!(html.contains("href=\"../syntax-rust.css\""));
@@ -193,8 +203,11 @@ mod tests {
         assert!(html.contains("<p>Hi</p>"));
         assert!(html.contains("<html lang=\"nl\">"));
         assert!(html.contains("<meta name=\"description\" content=\"A short description\">"));
+        assert!(
+            html.contains("type=\"application/rss+xml\" href=\"../rss.xml\" title=\"RSS Feed\"")
+        );
         assert!(html.contains("<footer class=\"page-metadata\">"));
-        assert!(html.contains("Published <time datetime=\"2026-01-02\">2026-01-02</time>"));
+        assert!(html.contains("published <time datetime=\"2026-01-02\">2026-01-02</time>"));
     }
 
     #[test]

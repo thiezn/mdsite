@@ -41,7 +41,10 @@ pub fn generate(feed: Feed<'_>) -> String {
             rfc822_date(date),
         ));
         if let Some(language) = item.language {
-            xml.push_str(&format!("      <language>{}</language>\n", escape(language)));
+            xml.push_str(&format!(
+                "      <language>{}</language>\n",
+                escape(language)
+            ));
         }
         xml.push_str("    </item>\n");
     }
@@ -62,7 +65,9 @@ fn rfc822_date(date: &str) -> String {
 
 fn parse_date(date: &str) -> Option<(i64, u32, u32)> {
     let mut parts = date.split('-');
-    let (Some(year), Some(month), Some(day), None) = (parts.next(), parts.next(), parts.next(), parts.next()) else {
+    let (Some(year), Some(month), Some(day), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
         return None;
     };
     Some((year.parse().ok()?, month.parse().ok()?, day.parse().ok()?))
@@ -71,7 +76,8 @@ fn parse_date(date: &str) -> Option<(i64, u32, u32)> {
 fn weekday(year: i64, month: u32, day: u32) -> &'static str {
     let month = if month < 3 { month + 12 } else { month } as i64;
     let year = if month > 12 { year - 1 } else { year };
-    let day_of_week = (day as i64 + 13 * (month + 1) / 5 + year + year / 4 - year / 100 + year / 400) % 7;
+    let day_of_week =
+        (day as i64 + 13 * (month + 1) / 5 + year + year / 4 - year / 100 + year / 400) % 7;
     ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"][day_of_week as usize]
 }
 

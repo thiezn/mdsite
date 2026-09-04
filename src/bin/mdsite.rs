@@ -29,7 +29,11 @@ fn main() -> ExitCode {
     match cli.command {
         Commands::Build { input, output } => match mdsite::build(&input, &output) {
             Ok(()) => {
-                eprintln!("Built site from {} into {}", input.display(), output.display());
+                eprintln!(
+                    "Built site from {} into {}",
+                    input.display(),
+                    output.display()
+                );
                 ExitCode::SUCCESS
             }
             Err(e) => {
