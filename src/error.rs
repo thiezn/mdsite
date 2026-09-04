@@ -19,15 +19,6 @@ pub enum Error {
     #[error("input path is not a directory: {0}")]
     InputNotDirectory(PathBuf),
 
-    #[error("mermaid-cli (`mmdc`) was not found on PATH. Install @mermaid-js/mermaid-cli (mmdc) to render Mermaid diagrams.")]
-    MermaidCliMissing,
-
-    #[error("mermaid-cli failed for {path}: {message}")]
-    MermaidRender {
-        path: PathBuf,
-        message: String,
-    },
-
     #[error("{0}")]
     Other(String),
 }

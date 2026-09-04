@@ -29,7 +29,7 @@ flowchart LR
   md[Markdown] --> mdsite[mdsite build]
   mdsite --> html[HTML + CSS]
   mdsite --> sibling[Sibling .md]
-  mdsite --> svg[Mermaid SVG]
+  mdsite --> diagram[Static HTML diagram]
 ```
 
 Every HTML page also links to its Markdown source beside it.

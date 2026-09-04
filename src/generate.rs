@@ -5,7 +5,7 @@ use crate::error::Result;
 use crate::html;
 use crate::markdown::{extract_mermaid, markdown_to_html};
 use crate::mermaid;
-use crate::walk::{collect_markdown_files, MdFile};
+use crate::walk::{MdFile, collect_markdown_files};
 use std::fs;
 use std::path::Path;
 
@@ -14,7 +14,7 @@ use std::path::Path;
 /// For each `.md` file:
 /// - emit a matching `.html` page (folder structure preserved),
 /// - copy the `.md` next to the `.html`,
-/// - render Mermaid fences to sibling SVG images (requires `mmdc`).
+/// - render Mermaid fences as styled HTML diagrams.
 ///
 /// Writes a shared `style.css` at the output root.
 pub fn build(input: &Path, output: &Path) -> Result<()> {
@@ -32,12 +32,6 @@ fn convert_file(file: &MdFile, output_root: &Path) -> Result<()> {
     let md_bytes = fs::read(&file.absolute)?;
     let md_text = String::from_utf8(md_bytes)?;
 
-    let stem = file
-        .relative
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("page");
-
     let html_rel = file.relative.with_extension("html");
     let out_dir = match html_rel.parent() {
         Some(p) if !p.as_os_str().is_empty() => output_root.join(p),
@@ -45,10 +39,17 @@ fn convert_file(file: &MdFile, output_root: &Path) -> Result<()> {
     };
     fs::create_dir_all(&out_dir)?;
 
-    let prepared = extract_mermaid(&md_text, stem);
-    mermaid::render_blocks(&prepared.mermaid, &out_dir, stem)?;
-
-    let body = markdown_to_html(&prepared.markdown);
+    let prepared = extract_mermaid(&md_text);
+    let mut body = markdown_to_html(&prepared.markdown);
+    for block in &prepared.mermaid {
+        let placeholder = format!(
+            "<pre class=\"mermaid-placeholder\" data-index=\"{}\"></pre>",
+            block.index
+        );
+        let diagram = mermaid::render_html(&block.source, Some(120)).unwrap_or_default();
+        let rendered = format!("<pre class=\"mermaid\">{diagram}</pre>");
+        body = body.replace(&placeholder, &rendered);
+    }
     let title = html::title_from_path(&file.relative);
     let css_href = css::relative_css_href(&html_rel);
     let md_href = file
@@ -122,5 +123,25 @@ mod tests {
             }
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    #[test]
+    fn build_renders_mermaid_as_embedded_html() {
+        let input = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        fs::write(
+            input.path().join("index.md"),
+            "# Diagram\n\n```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n",
+        )
+        .unwrap();
+
+        build(input.path(), output.path()).unwrap();
+
+        let index = fs::read_to_string(output.path().join("index.html")).unwrap();
+        assert!(index.contains("<pre class=\"mermaid\">"));
+        assert!(index.contains("Start"));
+        assert!(index.contains("class=\"b\""));
+        assert!(!index.contains("-mermaid-1.svg"));
+        assert!(!output.path().join("index-mermaid-1.svg").exists());
     }
 }

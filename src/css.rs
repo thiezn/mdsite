@@ -70,11 +70,19 @@ main pre code {
   padding: 0;
   font-size: 0.875em;
 }
-main img.mermaid {
+main pre.mermaid {
   display: block;
   max-width: 100%;
-  height: auto;
   margin: 1.25rem 0;
+  white-space: pre;
+  line-height: 1.2;
+}
+main pre.mermaid .b { color: var(--muted); }
+main pre.mermaid .n { color: var(--fg); }
+main pre.mermaid .e { color: var(--link); }
+main pre.mermaid .el { color: var(--muted); }
+main pre.mermaid .t { color: var(--fg); font-weight: 700; }
+main pre.mermaid .i { font-style: italic; }
 }
 "#;
 

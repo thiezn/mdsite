@@ -15,7 +15,7 @@ pub struct PreparedMarkdown {
     pub mermaid: Vec<MermaidBlock>,
 }
 
-pub fn extract_mermaid(markdown: &str, stem: &str) -> PreparedMarkdown {
+pub fn extract_mermaid(markdown: &str) -> PreparedMarkdown {
     let mut out = String::with_capacity(markdown.len());
     let mut mermaid = Vec::new();
     let mut lines = markdown.lines().peekable();
@@ -37,9 +37,8 @@ pub fn extract_mermaid(markdown: &str, stem: &str) -> PreparedMarkdown {
                     }
                     body.push_str(inner);
                 }
-                let filename = format!("{stem}-mermaid-{index}.svg");
                 out.push_str(&format!(
-                    "\n<img class=\"mermaid\" src=\"{filename}\" alt=\"Mermaid diagram {index}\" />\n\n"
+                    "\n<pre class=\"mermaid-placeholder\" data-index=\"{index}\"></pre>\n\n"
                 ));
                 mermaid.push(MermaidBlock {
                     index,
@@ -69,7 +68,7 @@ pub fn extract_mermaid(markdown: &str, stem: &str) -> PreparedMarkdown {
 }
 
 /// Convert Markdown to an HTML fragment (no surrounding document).
-/// Lines that are already Mermaid <img> tags are passed through as raw HTML.
+/// Mermaid placeholders are passed through as raw HTML.
 pub fn markdown_to_html(markdown: &str) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -80,7 +79,7 @@ pub fn markdown_to_html(markdown: &str) -> String {
 
     for line in markdown.lines() {
         let t = line.trim();
-        if t.starts_with("<img class=\"mermaid\"") && t.ends_with("/>") {
+        if t.starts_with("<pre class=\"mermaid-placeholder\"") && t.ends_with("</pre>") {
             if !md_buf.is_empty() {
                 let parser = Parser::new_ext(&md_buf, options);
                 pulldown_cmark::html::push_html(&mut html, parser);
@@ -108,10 +107,10 @@ mod tests {
     #[test]
     fn extracts_mermaid_and_keeps_code() {
         let md = "# Hi\n\n```mermaid\ngraph TD; A-->B;\n```\n\n```rust\nfn main() {}\n```\n";
-        let prep = extract_mermaid(md, "page");
+        let prep = extract_mermaid(md);
         assert_eq!(prep.mermaid.len(), 1);
         assert!(prep.mermaid[0].source.contains("graph TD"));
-        assert!(prep.markdown.contains("page-mermaid-1.svg"));
+        assert!(prep.markdown.contains("data-index=\"1\""));
         assert!(prep.markdown.contains("```rust"));
         assert!(!prep.markdown.contains("```mermaid"));
     }
