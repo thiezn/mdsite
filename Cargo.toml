@@ -1,0 +1,20 @@
+[package]
+name = "mdsite"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal static site generator from Markdown"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+thiserror = "2"
+walkdir = "2"
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "mdsite"
+path = "src/bin/mdsite.rs"
