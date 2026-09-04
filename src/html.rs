@@ -5,7 +5,7 @@ pub fn render_page(
     title: &str,
     body_html: &str,
     css_hrefs: &[String],
-    md_href: &str,
+    md_href: Option<&str>,
     page_rel: &std::path::Path,
 ) -> String {
     let title_esc = escape_text(title);
@@ -14,7 +14,27 @@ pub fn render_page(
         .map(|href| format!("<link rel=\"stylesheet\" href=\"{}\">", escape_text(href)))
         .collect::<Vec<_>>()
         .join("\n");
+    let markdown_alternate = md_href.map_or_else(String::new, |_| {
+        let markdown_path = page_rel
+            .with_extension("md")
+            .to_string_lossy()
+            .replace('\\', "/");
+        let depth = page_rel
+            .parent()
+            .map_or(0, |path| path.components().count());
+        let href = format!("{}{}", "../".repeat(depth), markdown_path);
+        format!(
+            "<link rel=\"alternate\" type=\"text/markdown\" href=\"{}\">",
+            escape_text(&href)
+        )
+    });
     let breadcrumbs = breadcrumb_html(page_rel);
+    let markdown_source = md_href.map_or_else(String::new, |href| {
+        format!(
+            "\n<a title=\"markdown\" class=\"markdown-source\" href=\"{}\">.md</a>",
+            escape_text(href)
+        )
+    });
     format!(
         r##"<!DOCTYPE html>
 <html lang="en">
@@ -23,11 +43,12 @@ pub fn render_page(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 {stylesheets}
+{markdown_alternate}
 </head>
 <body>
 <header>
 <nav class="breadcrumbs" aria-label="Breadcrumb">{breadcrumbs}</nav>
-<a class="markdown-source" href="{md}">markdown</a>
+{markdown_source}
 </header>
 <main>
 {body}
@@ -37,8 +58,9 @@ pub fn render_page(
 "##,
         title = title_esc,
         stylesheets = stylesheets,
+        markdown_alternate = markdown_alternate,
         breadcrumbs = breadcrumbs,
-        md = md_href,
+        markdown_source = markdown_source,
         body = body_html,
     )
 }
@@ -49,7 +71,9 @@ fn breadcrumb_html(page_rel: &std::path::Path) -> String {
         .components()
         .filter_map(|component| component.as_os_str().to_str())
         .collect();
-    let depth = components.len().saturating_sub(1);
+    let depth = page_rel
+        .parent()
+        .map_or(0, |path| path.components().count());
     let mut crumbs = Vec::new();
 
     if components
@@ -62,14 +86,17 @@ fn breadcrumb_html(page_rel: &std::path::Path) -> String {
 
     for (index, component) in components.iter().enumerate() {
         let label = if components.len() == 1 && *component == "index" {
-            "home"
+            "home".to_string()
         } else {
-            component
+            component.replace('_', " ")
         };
         let crumb = if index + 1 == components.len() {
-            format!("<span aria-current=\"page\">{}</span>", escape_text(label))
+            format!("<span aria-current=\"page\">{}</span>", escape_text(&label))
         } else {
-            format!("<span>{}</span>", escape_text(label))
+            let target =
+                std::path::Path::new(&components[..=index].join("/")).with_extension("html");
+            let href = format!("{}{}", "../".repeat(depth), target.display());
+            format!("<a href=\"{href}\">{}</a>", escape_text(&label))
         };
         crumbs.push(crumb);
     }
@@ -104,16 +131,18 @@ mod tests {
             "Hello",
             "<p>Hi</p>",
             &["../style.css".to_string(), "../syntax-rust.css".to_string()],
-            "hello.md",
+            Some("hello.md"),
             Path::new("docs/hello.md"),
         );
         assert!(html.contains("href=\"../style.css\""));
         assert!(html.contains("href=\"../syntax-rust.css\""));
-        assert!(html.contains(">markdown</a>"));
+        assert!(
+            html.contains("rel=\"alternate\" type=\"text/markdown\" href=\"../docs/hello.md\"")
+        );
         assert!(html.contains("href=\"hello.md\""));
         assert!(html.contains("<nav class=\"breadcrumbs\""));
         assert!(html.contains("href=\"../index.html\">home</a>"));
-        assert!(html.contains("<span>docs</span>"));
+        assert!(html.contains("href=\"../docs.html\">docs</a>"));
         assert!(html.contains("<span aria-current=\"page\">hello</span>"));
         assert!(html.contains("<main>"));
         assert!(html.contains("<p>Hi</p>"));

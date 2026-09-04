@@ -4,6 +4,7 @@
 
 mod css;
 mod error;
+mod frontmatter;
 mod generate;
 mod html;
 mod markdown;

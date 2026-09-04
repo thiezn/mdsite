@@ -36,7 +36,6 @@ header {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.75rem;
   padding: 0.125rem 0;
 }
 header a {
@@ -61,6 +60,7 @@ main h1, main h2, main h3, main h4, main h5, main h6 {
   margin-top: 1.5em;
   margin-bottom: 0.5em;
 }
+main > h1:first-child { margin-top: 0; }
 main p { margin: 0.75em 0; }
 main a { color: var(--link); }
 main ul, main ol { padding-left: 1.5rem; }
@@ -102,7 +102,7 @@ main pre.mermaid .i { font-style: italic; }
 
 /// Relative path from an HTML page (relative to output root) to `style.css`.
 pub fn relative_css_href(page_rel: &std::path::Path) -> String {
-  relative_asset_href(page_rel, "style.css")
+    relative_asset_href(page_rel, "style.css")
 }
 
 /// Relative path from an HTML page to an output-root asset.
@@ -112,9 +112,9 @@ pub fn relative_asset_href(page_rel: &std::path::Path, asset: &str) -> String {
         .map(|p| p.components().count())
         .unwrap_or(0);
     if depth == 0 {
-    asset.to_string()
+        asset.to_string()
     } else {
-    format!("{}{}", "../".repeat(depth), asset)
+        format!("{}{}", "../".repeat(depth), asset)
     }
 }
 
@@ -142,9 +142,9 @@ mod tests {
 
     #[test]
     fn asset_href_nested() {
-      assert_eq!(
-        relative_asset_href(Path::new("docs/guide.html"), "syntax-rust.css"),
-        "../syntax-rust.css"
-      );
+        assert_eq!(
+            relative_asset_href(Path::new("docs/guide.html"), "syntax-rust.css"),
+            "../syntax-rust.css"
+        );
     }
 }
