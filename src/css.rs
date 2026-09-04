@@ -1,0 +1,115 @@
+//! Shared stylesheet for generated sites.
+
+/// Minimal clean CSS written to the output root as `style.css`.
+pub const STYLE_CSS: &str = r#"/* mdsite - minimal clean styles */
+:root {
+  color-scheme: light dark;
+  --fg: #1a1a1a;
+  --bg: #fafafa;
+  --muted: #555;
+  --border: #ddd;
+  --code-bg: #f0f0f0;
+  --link: #0645ad;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #e8e8e8;
+    --bg: #1a1a1a;
+    --muted: #aaa;
+    --border: #333;
+    --code-bg: #2a2a2a;
+    --link: #8ab4f8;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0 auto;
+  max-width: 48rem;
+  padding: 1.5rem 1.25rem 3rem;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.6;
+  color: var(--fg);
+  background: var(--bg);
+}
+header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+header a {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+header a:hover { text-decoration: underline; }
+main h1, main h2, main h3, main h4, main h5, main h6 {
+  line-height: 1.25;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+main p { margin: 0.75em 0; }
+main a { color: var(--link); }
+main ul, main ol { padding-left: 1.5rem; }
+main li { margin: 0.25em 0; }
+main code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+main pre {
+  background: var(--code-bg);
+  padding: 1rem;
+  overflow-x: auto;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+main pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875em;
+}
+main img.mermaid {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem 0;
+}
+"#;
+
+/// Relative path from an HTML page (relative to output root) to `style.css`.
+pub fn relative_css_href(page_rel: &std::path::Path) -> String {
+    let depth = page_rel
+        .parent()
+        .map(|p| p.components().count())
+        .unwrap_or(0);
+    if depth == 0 {
+        "style.css".to_string()
+    } else {
+        format!("{}style.css", "../".repeat(depth))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn css_href_root() {
+        assert_eq!(relative_css_href(Path::new("index.html")), "style.css");
+    }
+
+    #[test]
+    fn css_href_nested() {
+        assert_eq!(
+            relative_css_href(Path::new("docs/guide.html")),
+            "../style.css"
+        );
+        assert_eq!(
+            relative_css_href(Path::new("a/b/c.html")),
+            "../../style.css"
+        );
+    }
+}
