@@ -13,26 +13,54 @@ Minimal static site generator: Markdown in, clean HTML out.
 
 ## Install
 
-    cargo install --path .
+```bash
+cargo install --path .
+```
 
 ## Usage
 
-    mdsite build --input ./content --output ./site
+```bash
+mdsite build --input ./content --output ./site
+```
 
 Library API:
 
-    mdsite::build(input_dir, output_dir)?;
+```rust
+mdsite::build(input_dir, output_dir)?;
+```
+
+Demo content lives in `examples/demo/`.
 
 ## Mermaid dependency
 
 Pages that contain mermaid fences require mermaid-cli on your PATH.
-Install the npm package for mermaid-cli so mmdc is available.
-If mmdc is missing, mdsite returns a clear error. Diagrams are written
-beside the HTML as {stem}-mermaid-{n}.svg. The copied .md keeps the original fence.
+
+```bash
+npm install -g @mermaid-js/mermaid-cli
+```
+
+If `mmdc` is missing, mdsite returns `Error::MermaidCliMissing`. Diagrams are written beside the HTML as `{stem}-mermaid-{n}.svg`. The copied `.md` keeps the original fence.
+
+## CI and GitHub Pages
+
+Workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml):
+
+1. `cargo test`
+2. `cargo build --release`
+3. Install `mmdc`, generate `examples/demo` into `_site`
+4. Upload the site as a workflow artifact (every PR/push)
+5. On `main` (or `workflow_dispatch`), deploy `_site` to GitHub Pages
+
+One-time repo setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+After the first successful deploy from `main`, the site is at `https://thiezn.github.io/mdsite/`.
 
 ## Development
 
-    cargo test
-    cargo build --release
+```bash
+cargo test
+cargo build --release
+./target/release/mdsite build --input examples/demo --output /tmp/mdsite-demo
+```
 
-Mermaid render tests skip when mmdc is absent.
+Mermaid render tests skip when `mmdc` is absent.
