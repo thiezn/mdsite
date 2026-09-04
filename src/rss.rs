@@ -1,11 +1,13 @@
 //! RSS 2.0 feed generation.
 
+use chrono::{DateTime, Utc};
+
 pub struct Feed<'a> {
     pub title: &'a str,
     pub description: &'a str,
     pub language: &'a str,
     pub link: &'a str,
-    pub build_date: &'a str,
+    pub build_date: &'a DateTime<Utc>,
     pub items: Vec<Item<'a>>,
 }
 
@@ -14,8 +16,8 @@ pub struct Item<'a> {
     pub description: Option<&'a str>,
     pub language: Option<&'a str>,
     pub link: String,
-    pub publish_date: Option<&'a str>,
-    pub last_updated_at: Option<&'a str>,
+    pub publish_date: Option<&'a DateTime<Utc>>,
+    pub last_updated_at: Option<&'a DateTime<Utc>>,
 }
 
 pub fn generate(feed: Feed<'_>) -> String {
@@ -52,33 +54,8 @@ pub fn generate(feed: Feed<'_>) -> String {
     xml
 }
 
-fn rfc822_date(date: &str) -> String {
-    let Some((year, month, day)) = parse_date(date) else {
-        return date.to_owned();
-    };
-    let weekday = weekday(year, month, day);
-    let month_name = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ][month as usize - 1];
-    format!("{weekday}, {day:02} {month_name} {year:04} 00:00:00 GMT")
-}
-
-fn parse_date(date: &str) -> Option<(i64, u32, u32)> {
-    let mut parts = date.split('-');
-    let (Some(year), Some(month), Some(day), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
-        return None;
-    };
-    Some((year.parse().ok()?, month.parse().ok()?, day.parse().ok()?))
-}
-
-fn weekday(year: i64, month: u32, day: u32) -> &'static str {
-    let month = if month < 3 { month + 12 } else { month } as i64;
-    let year = if month > 12 { year - 1 } else { year };
-    let day_of_week =
-        (day as i64 + 13 * (month + 1) / 5 + year + year / 4 - year / 100 + year / 400) % 7;
-    ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"][day_of_week as usize]
+fn rfc822_date(date: &DateTime<Utc>) -> String {
+    date.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
 
 fn escape(text: &str) -> String {
@@ -91,6 +68,7 @@ fn escape(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     #[test]
     fn generates_an_rss_feed_from_item_metadata() {
@@ -99,19 +77,19 @@ mod tests {
             description: "Site description",
             language: "en",
             link: "https://example.com",
-            build_date: "2026-09-04",
+            build_date: &Utc.with_ymd_and_hms(2026, 9, 4, 20, 31, 0).unwrap(),
             items: vec![Item {
                 title: "First post",
                 description: Some("Post description"),
                 language: Some("nl"),
                 link: "https://example.com/first.html".to_owned(),
-                publish_date: Some("2026-01-02"),
-                last_updated_at: Some("2026-03-04"),
+                publish_date: Some(&Utc.with_ymd_and_hms(2026, 1, 2, 0, 0, 0).unwrap()),
+                last_updated_at: Some(&Utc.with_ymd_and_hms(2026, 3, 4, 20, 31, 0).unwrap()),
             }],
         });
         assert!(xml.contains("<rss version=\"2.0\">"));
         assert!(xml.contains("<description>Post description</description>"));
         assert!(xml.contains("<language>nl</language>"));
-        assert!(xml.contains("<pubDate>Wed, 04 Mar 2026 00:00:00 GMT</pubDate>"));
+        assert!(xml.contains("<pubDate>Wed, 04 Mar 2026 20:31:00 GMT</pubDate>"));
     }
 }

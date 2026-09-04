@@ -9,10 +9,10 @@ use crate::mermaid;
 use crate::rss;
 use crate::syntax;
 use crate::walk::{MdFile, collect_asset_files, collect_markdown_files};
+use chrono::{DateTime, SecondsFormat, Utc};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 struct SiteConfig {
     domain: String,
@@ -27,8 +27,8 @@ struct PageMetadata {
     title: Option<String>,
     description: Option<String>,
     language: Option<String>,
-    publish_date: Option<String>,
-    last_updated_at: Option<String>,
+    publish_date: Option<DateTime<Utc>>,
+    last_updated_at: Option<DateTime<Utc>>,
     include_in_rss: bool,
     include_in_sitemap: bool,
 }
@@ -214,6 +214,7 @@ fn convert_file(file: &MdFile, output_root: &Path, include_rss_link: bool) -> Re
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("source.md");
+    let footer = parsed.footer.as_deref().and_then(footer_html);
     let page = html::render_page(
         &title,
         &body,
@@ -222,8 +223,9 @@ fn convert_file(file: &MdFile, output_root: &Path, include_rss_link: bool) -> Re
         &file.relative,
         parsed.description.as_deref(),
         parsed.language.as_deref(),
-        parsed.publish_date.as_deref(),
-        parsed.last_updated_at.as_deref(),
+        parsed.publish_date.as_ref(),
+        parsed.last_updated_at.as_ref(),
+        footer.as_deref(),
         include_rss_link.then(|| css::relative_asset_href(&html_rel, "rss.xml")),
     );
 
@@ -303,6 +305,7 @@ fn generate_directory_pages(
             None,
             None,
             None,
+            None,
             include_rss_link.then(|| css::relative_asset_href(&html_rel, "rss.xml")),
         );
         fs::write(output_root.join(html_rel), page)?;
@@ -319,6 +322,13 @@ fn generate_directory_pages(
     }
 
     Ok(generated_pages)
+}
+
+fn footer_html(markdown: &str) -> Option<String> {
+    let html = markdown_to_html(markdown);
+    html.strip_prefix("<p>")
+        .and_then(|html| html.strip_suffix("</p>\n"))
+        .map(str::to_owned)
 }
 
 fn generate_site_metadata(
@@ -352,11 +362,12 @@ fn generate_site_metadata(
             let path = html_page.to_string_lossy().replace('\\', "/");
             let location = page_url(&config.domain, &path);
             let last_modified = metadata
-                .and_then(|metadata| metadata.last_updated_at.as_deref())
-                .or_else(|| metadata.and_then(|metadata| metadata.publish_date.as_deref()))
+                .and_then(|metadata| metadata.last_updated_at.as_ref())
+                .or_else(|| metadata.and_then(|metadata| metadata.publish_date.as_ref()))
                 .unwrap_or(&date);
             sitemap.push_str(&format!(
-                "  <url>\n    <loc>{location}</loc>\n    <lastmod>{last_modified}</lastmod>\n  </url>\n"
+                "  <url>\n    <loc>{location}</loc>\n    <lastmod>{}</lastmod>\n  </url>\n",
+                last_modified.to_rfc3339_opts(SecondsFormat::Secs, true),
             ));
         }
         sitemap.push_str("</urlset>\n");
@@ -424,8 +435,8 @@ fn generate_site_metadata(
                             .to_string_lossy()
                             .replace('\\', "/"),
                     ),
-                    publish_date: metadata.publish_date.as_deref(),
-                    last_updated_at: metadata.last_updated_at.as_deref(),
+                    publish_date: metadata.publish_date.as_ref(),
+                    last_updated_at: metadata.last_updated_at.as_ref(),
                 })
             })
             .collect();
@@ -466,32 +477,8 @@ fn page_url(domain: &str, path: &str) -> String {
     }
 }
 
-fn generation_date() -> Result<String> {
-    let days = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| crate::error::Error::Other(format!("system clock: {error}")))?
-        .as_secs()
-        / 86_400;
-    let (year, month, day) = civil_date_from_days(days as i64);
-    Ok(format!("{year:04}-{month:02}-{day:02}"))
-}
-
-fn civil_date_from_days(days_since_epoch: i64) -> (i64, u32, u32) {
-    let adjusted_days = days_since_epoch + 719_468;
-    let era = if adjusted_days >= 0 {
-        adjusted_days
-    } else {
-        adjusted_days - 146_096
-    } / 146_097;
-    let day_of_era = adjusted_days - era * 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_parameter = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_parameter + 2) / 5 + 1;
-    let month = month_parameter + if month_parameter < 10 { 3 } else { -9 };
-    (year + i64::from(month <= 2), month as u32, day as u32)
+fn generation_date() -> Result<DateTime<Utc>> {
+    Ok(Utc::now())
 }
 
 #[cfg(test)]
@@ -592,12 +579,12 @@ mod tests {
         fs::create_dir_all(input.path().join("guides")).unwrap();
         fs::write(
             input.path().join("index.md"),
-            "---\ntitle: Home\ndescription: Home page\nlanguage: en\npublish_date: 2026-01-02\n---\nWelcome home.\n",
+            "---\ntitle: Home\ndescription: Home page\nlanguage: en\npublish_date: 2026-01-02T20:31\n---\nWelcome home.\n",
         )
         .unwrap();
         fs::write(
             input.path().join("guides/start.md"),
-            "---\ntitle: Start\ndescription: Get started\nlanguage: nl\nlast_updated_at: 2026-03-04\ninclude_in_sitemap: false\n---\nGet started.\n",
+            "---\ntitle: Start\ndescription: Get started\nlanguage: nl\nlast_updated_at: 2026-03-04T20:31:00+02:00\ninclude_in_sitemap: false\n---\nGet started.\n",
         )
         .unwrap();
         fs::write(
@@ -619,9 +606,12 @@ mod tests {
         assert!(sitemap.contains("<loc>https://example.com/guides.html</loc>"));
         assert!(sitemap.contains("<loc>https://example.com/guides/hidden.html</loc>"));
         assert!(!sitemap.contains("https://example.com/guides/start.html"));
-        assert!(sitemap.contains("<lastmod>2026-01-02</lastmod>"));
-        assert!(sitemap.contains("<lastmod>2026-02-03</lastmod>"));
-        assert!(sitemap.contains(&format!("<lastmod>{date}</lastmod>")));
+        assert!(sitemap.contains("<lastmod>2026-01-02T20:31:00Z</lastmod>"));
+        assert!(sitemap.contains("<lastmod>2026-02-03T00:00:00Z</lastmod>"));
+        assert!(sitemap.contains(&format!(
+            "<lastmod>{}</lastmod>",
+            date.to_rfc3339_opts(SecondsFormat::Secs, true)
+        )));
 
         let llms = fs::read_to_string(output.path().join("llms.txt")).unwrap();
         assert!(llms.starts_with("[Full site content](llms-full.txt):"));
@@ -638,13 +628,15 @@ mod tests {
         let home = fs::read_to_string(output.path().join("index.html")).unwrap();
         assert!(home.contains("<html lang=\"en\">"));
         assert!(home.contains("<meta name=\"description\" content=\"Home page\">"));
-        assert!(home.contains("published <time datetime=\"2026-01-02\">2026-01-02</time>"));
+        assert!(
+            home.contains("published <time datetime=\"2026-01-02T20:31:00Z\">02-01-2026</time>")
+        );
 
         let rss = fs::read_to_string(output.path().join("rss.xml")).unwrap();
         assert!(rss.contains("<title>Home</title>"));
         assert!(rss.contains("<description>Home page</description>"));
         assert!(rss.contains("https://example.com/guides/start.html"));
-        assert!(rss.contains("<pubDate>Wed, 04 Mar 2026 00:00:00 GMT</pubDate>"));
+        assert!(rss.contains("<pubDate>Wed, 04 Mar 2026 18:31:00 GMT</pubDate>"));
         assert!(!rss.contains("https://example.com/guides/hidden.html"));
         assert!(!output.path().join("mdsite.toml").exists());
     }
@@ -740,7 +732,7 @@ mod tests {
         let output = tempfile::tempdir().unwrap();
         fs::write(
             input.path().join("index.md"),
-            "# Diagram\n\n```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n",
+            "---\nfooter: \"Made with *care*.\"\n---\n# Diagram\n\n```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n",
         )
         .unwrap();
         write_config(input.path());
@@ -751,6 +743,7 @@ mod tests {
         assert!(index.contains("<pre class=\"mermaid\">"));
         assert!(index.contains("Start"));
         assert!(index.contains("class=\"e\""));
+        assert!(index.contains("<div class=\"page-footer\">Made with <em>care</em>.</div>"));
         assert!(!index.contains("-mermaid-1.svg"));
         assert!(!output.path().join("index-mermaid-1.svg").exists());
     }

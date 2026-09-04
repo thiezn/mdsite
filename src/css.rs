@@ -65,11 +65,17 @@ main p { margin: 0.75em 0; }
 main a { color: var(--link); }
 .page-metadata {
   margin-top: 2rem;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.5;
-  text-align: right;
 }
+.page-footer { text-align: left; }
+.page-footer a { color: inherit; }
+.page-dates { margin-left: auto; text-align: right; }
 main ul, main ol { padding-left: 1.5rem; }
 main li { margin: 0.25em 0; }
 main code {

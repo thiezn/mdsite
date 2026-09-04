@@ -58,16 +58,19 @@ to the generated sitemap. Set `generate_robots = false` to disable this default.
 
 Pages may start with frontmatter. `description` is emitted as an HTML metadata
 description and used in RSS; `language` sets the page HTML language and RSS item
-language. `publish_date` and `last_updated_at` use `YYYY-MM-DD` and appear at
-the bottom-right of the page. The sitemap uses `last_updated_at`, then
-`publish_date`, then the build date. Both inclusion flags default to `true`.
+language. `publish_date` and `last_updated_at` accept ISO-8601 UTC timestamps;
+date-only values such as `2026-09-01` mean midnight UTC, while timestamps
+without an offset are also assumed UTC. The page footer displays their dates as
+`DD-MM-YYYY`; the sitemap emits full UTC ISO-8601 timestamps and RSS emits RFC
+822 dates. The sitemap uses `last_updated_at`, then `publish_date`, then the
+build time. Both inclusion flags default to `true`.
 
 ```markdown
 ---
 title: "Example page"
 description: "A concise page summary"
 language: en
-publish_date: 2026-09-01
+publish_date: 2026-09-01T20:31:00Z
 last_updated_at: 2026-09-04
 include_in_rss: true
 include_in_sitemap: true

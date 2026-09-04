@@ -1,5 +1,7 @@
 //! HTML document assembly.
 
+use chrono::{DateTime, SecondsFormat, Utc};
+
 /// Build a minimal semantic HTML document.
 pub fn render_page(
     title: &str,
@@ -9,8 +11,9 @@ pub fn render_page(
     page_rel: &std::path::Path,
     description: Option<&str>,
     language: Option<&str>,
-    publish_date: Option<&str>,
-    last_updated_at: Option<&str>,
+    publish_date: Option<&DateTime<Utc>>,
+    last_updated_at: Option<&DateTime<Utc>>,
+    footer: Option<&str>,
     rss_href: Option<String>,
 ) -> String {
     let title_esc = escape_text(title);
@@ -53,7 +56,7 @@ pub fn render_page(
             escape_text(href)
         )
     });
-    let page_metadata = page_metadata_html(publish_date, last_updated_at);
+    let page_metadata = page_metadata_html(publish_date, last_updated_at, footer);
     format!(
         r##"<!DOCTYPE html>
 <html lang="{language}">
@@ -91,27 +94,38 @@ pub fn render_page(
     )
 }
 
-fn page_metadata_html(publish_date: Option<&str>, last_updated_at: Option<&str>) -> String {
+fn page_metadata_html(
+    publish_date: Option<&DateTime<Utc>>,
+    last_updated_at: Option<&DateTime<Utc>>,
+    footer: Option<&str>,
+) -> String {
     let mut dates = Vec::new();
     if let Some(date) = publish_date {
+        let datetime = date.to_rfc3339_opts(SecondsFormat::Secs, true);
         dates.push(format!(
-            "published <time datetime=\"{0}\">{0}</time>",
-            escape_text(date)
+            "published <time datetime=\"{datetime}\">{}</time>",
+            date.format("%d-%m-%Y")
         ));
     }
     if let Some(date) = last_updated_at {
+        let datetime = date.to_rfc3339_opts(SecondsFormat::Secs, true);
         dates.push(format!(
-            "updated <time datetime=\"{0}\">{0}</time>",
-            escape_text(date)
+            "updated <time datetime=\"{datetime}\">{}</time>",
+            date.format("%d-%m-%Y")
         ));
     }
-    if dates.is_empty() {
+    if dates.is_empty() && footer.is_none() {
         String::new()
     } else {
-        format!(
-            "<footer class=\"page-metadata\">{}</footer>",
-            dates.join("<br>")
-        )
+        let footer = footer.map_or_else(String::new, |footer| {
+            format!("<div class=\"page-footer\">{footer}</div>")
+        });
+        let dates = if dates.is_empty() {
+            String::new()
+        } else {
+            format!("<div class=\"page-dates\">{}</div>", dates.join("<br>"))
+        };
+        format!("<footer class=\"page-metadata\">{footer}{dates}</footer>",)
     }
 }
 
@@ -173,6 +187,7 @@ fn escape_text(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
     use std::path::Path;
 
     #[test]
@@ -185,8 +200,9 @@ mod tests {
             Path::new("docs/hello.md"),
             Some("A short description"),
             Some("nl"),
-            Some("2026-01-02"),
-            Some("2026-03-04"),
+            Some(&Utc.with_ymd_and_hms(2026, 1, 2, 0, 0, 0).unwrap()),
+            Some(&Utc.with_ymd_and_hms(2026, 3, 4, 0, 0, 0).unwrap()),
+            Some("<em>Made with care.</em>"),
             Some("../rss.xml".to_owned()),
         );
         assert!(html.contains("href=\"../style.css\""));
@@ -207,7 +223,11 @@ mod tests {
             html.contains("type=\"application/rss+xml\" href=\"../rss.xml\" title=\"RSS Feed\"")
         );
         assert!(html.contains("<footer class=\"page-metadata\">"));
-        assert!(html.contains("published <time datetime=\"2026-01-02\">2026-01-02</time>"));
+        assert!(html.contains("<div class=\"page-footer\"><em>Made with care.</em></div>"));
+        assert!(html.contains("<div class=\"page-dates\">"));
+        assert!(
+            html.contains("published <time datetime=\"2026-01-02T00:00:00Z\">02-01-2026</time>")
+        );
     }
 
     #[test]
