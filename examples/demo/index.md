@@ -22,6 +22,16 @@ fn main() {
 }
 ```
 
+```json
+{
+  "key": "value",
+  "some": [
+    "list",
+    "item"
+  ]
+}
+```
+
 ## Mermaid
 
 ```mermaid

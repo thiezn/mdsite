@@ -2,8 +2,13 @@
 
 
 /// Build a minimal semantic HTML document.
-pub fn render_page(title: &str, body_html: &str, css_href: &str, md_href: &str) -> String {
+pub fn render_page(title: &str, body_html: &str, css_hrefs: &[String], md_href: &str) -> String {
     let title_esc = escape_text(title);
+    let stylesheets: String = css_hrefs
+        .iter()
+        .map(|href| format!("<link rel=\"stylesheet\" href=\"{}\">", escape_text(href)))
+        .collect::<Vec<_>>()
+        .join("\n");
     format!(
         r##"<!DOCTYPE html>
 <html lang="en">
@@ -11,7 +16,7 @@ pub fn render_page(title: &str, body_html: &str, css_href: &str, md_href: &str) 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
-<link rel="stylesheet" href="{css}">
+{stylesheets}
 </head>
 <body>
 <header>
@@ -24,7 +29,7 @@ pub fn render_page(title: &str, body_html: &str, css_href: &str, md_href: &str) 
 </html>
 "##,
         title = title_esc,
-        css = css_href,
+        stylesheets = stylesheets,
         md = md_href,
         body = body_html,
     )
@@ -54,8 +59,14 @@ mod tests {
 
     #[test]
     fn page_contains_source_link_and_css() {
-        let html = render_page("Hello", "<p>Hi</p>", "../style.css", "hello.md");
+        let html = render_page(
+            "Hello",
+            "<p>Hi</p>",
+            &["../style.css".to_string(), "../syntax-rust.css".to_string()],
+            "hello.md",
+        );
         assert!(html.contains("href=\"../style.css\""));
+        assert!(html.contains("href=\"../syntax-rust.css\""));
         assert!(html.contains("Markdown source"));
         assert!(html.contains("href=\"hello.md\""));
         assert!(html.contains("<main>"));

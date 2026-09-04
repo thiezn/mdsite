@@ -3,9 +3,11 @@
 use crate::css::{self, STYLE_CSS};
 use crate::error::Result;
 use crate::html;
-use crate::markdown::{extract_mermaid, markdown_to_html};
+use crate::markdown::{extract_code_blocks, markdown_to_html};
 use crate::mermaid;
+use crate::syntax;
 use crate::walk::{MdFile, collect_markdown_files};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
@@ -14,14 +16,31 @@ use std::path::Path;
 /// For each `.md` file:
 /// - emit a matching `.html` page (folder structure preserved),
 /// - copy the `.md` next to the `.html`,
-/// - render Mermaid fences as styled HTML diagrams.
+/// - render Mermaid fences as styled HTML diagrams,
+/// - render other fenced blocks with syntax-specific stylesheets.
 ///
-/// Writes a shared `style.css` at the output root.
+/// Writes shared stylesheets at the output root.
 pub fn build(input: &Path, output: &Path) -> Result<()> {
     fs::create_dir_all(output)?;
     fs::write(output.join("style.css"), STYLE_CSS)?;
 
     let files = collect_markdown_files(input)?;
+    let mut syntax_stylesheets = BTreeSet::new();
+    for file in &files {
+        let markdown = fs::read_to_string(&file.absolute)?;
+        for block in extract_code_blocks(&markdown).blocks {
+            if !block.language.eq_ignore_ascii_case("mermaid") {
+                syntax_stylesheets.insert(syntax::stylesheet_filename(&block.language));
+            }
+        }
+    }
+    if !syntax_stylesheets.is_empty() {
+        let stylesheet = syntax::stylesheet();
+        for filename in syntax_stylesheets {
+            fs::write(output.join(filename), &stylesheet)?;
+        }
+    }
+
     for file in &files {
         convert_file(file, output)?;
     }
@@ -39,25 +58,36 @@ fn convert_file(file: &MdFile, output_root: &Path) -> Result<()> {
     };
     fs::create_dir_all(&out_dir)?;
 
-    let prepared = extract_mermaid(&md_text);
+    let prepared = extract_code_blocks(&md_text);
     let mut body = markdown_to_html(&prepared.markdown);
-    for block in &prepared.mermaid {
+    let mut syntax_stylesheets = BTreeSet::new();
+    for block in &prepared.blocks {
         let placeholder = format!(
-            "<pre class=\"mermaid-placeholder\" data-index=\"{}\"></pre>",
+            "<pre class=\"code-placeholder\" data-index=\"{}\"></pre>",
             block.index
         );
-        let diagram = mermaid::render_html(&block.source, Some(120)).unwrap_or_default();
-        let rendered = format!("<pre class=\"mermaid\">{diagram}</pre>");
+        let rendered = if block.language.eq_ignore_ascii_case("mermaid") {
+            let diagram = mermaid::render_html(&block.source, Some(120)).unwrap_or_default();
+            format!("<pre class=\"mermaid\">{diagram}</pre>")
+        } else {
+            syntax_stylesheets.insert(syntax::stylesheet_filename(&block.language));
+            syntax::render_html(&block.source, &block.language)
+        };
         body = body.replace(&placeholder, &rendered);
     }
     let title = html::title_from_path(&file.relative);
-    let css_href = css::relative_css_href(&html_rel);
+    let mut css_hrefs = vec![css::relative_css_href(&html_rel)];
+    css_hrefs.extend(
+        syntax_stylesheets
+            .iter()
+            .map(|filename| css::relative_asset_href(&html_rel, filename)),
+    );
     let md_href = file
         .relative
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("source.md");
-    let page = html::render_page(&title, &body, &css_href, md_href);
+    let page = html::render_page(&title, &body, &css_hrefs, md_href);
 
     let html_path = output_root.join(&html_rel);
     fs::write(&html_path, page)?;
@@ -143,5 +173,26 @@ mod tests {
         assert!(index.contains("class=\"b\""));
         assert!(!index.contains("-mermaid-1.svg"));
         assert!(!output.path().join("index-mermaid-1.svg").exists());
+    }
+
+    #[test]
+    fn build_renders_code_blocks_with_syntax_highlighting() {
+        let input = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        fs::write(
+            input.path().join("index.md"),
+            "# Code\n\n```rust\nfn main() {}\n```\n\n```python\nprint('hello')\n```\n",
+        )
+        .unwrap();
+
+        build(input.path(), output.path()).unwrap();
+
+        let index = fs::read_to_string(output.path().join("index.html")).unwrap();
+        assert!(index.contains("fn"));
+        assert!(index.contains("<pre class=\"code\">"));
+        assert!(index.contains("href=\"syntax-rust.css\""));
+        assert!(index.contains("href=\"syntax-python.css\""));
+        assert!(output.path().join("syntax-rust.css").is_file());
+        assert!(output.path().join("syntax-python.css").is_file());
     }
 }

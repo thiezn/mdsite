@@ -88,14 +88,19 @@ main pre.mermaid .i { font-style: italic; }
 
 /// Relative path from an HTML page (relative to output root) to `style.css`.
 pub fn relative_css_href(page_rel: &std::path::Path) -> String {
+  relative_asset_href(page_rel, "style.css")
+}
+
+/// Relative path from an HTML page to an output-root asset.
+pub fn relative_asset_href(page_rel: &std::path::Path, asset: &str) -> String {
     let depth = page_rel
         .parent()
         .map(|p| p.components().count())
         .unwrap_or(0);
     if depth == 0 {
-        "style.css".to_string()
+    asset.to_string()
     } else {
-        format!("{}style.css", "../".repeat(depth))
+    format!("{}{}", "../".repeat(depth), asset)
     }
 }
 
@@ -119,5 +124,13 @@ mod tests {
             relative_css_href(Path::new("a/b/c.html")),
             "../../style.css"
         );
+    }
+
+    #[test]
+    fn asset_href_nested() {
+      assert_eq!(
+        relative_asset_href(Path::new("docs/guide.html"), "syntax-rust.css"),
+        "../syntax-rust.css"
+      );
     }
 }

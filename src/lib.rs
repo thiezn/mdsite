@@ -8,6 +8,7 @@ mod generate;
 mod html;
 mod markdown;
 mod mermaid;
+mod syntax;
 mod walk;
 
 pub use error::{Error, Result};
