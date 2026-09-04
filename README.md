@@ -87,7 +87,7 @@ Demo content lives in `examples/demo/`.
 
 ## Publishing on GitHub Pages
 
-Have a look at the [repo](https://github.com/thiezn/mortimer.nl) for an example on how to publish the page to GitHub Pages. Make sure to follow GitHub's documentation and set the output folder to docs/ as described [here](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#about-publishing-sources)
+Have a look at the [repo](https://github.com/thiezn/mortimer.nl) I use formy personal site for an example on how to publish the page to GitHub Pages. Make sure to follow GitHub's documentation and set the output folder to docs/ as described [here](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#about-publishing-sources)
 
 ## Development
 
