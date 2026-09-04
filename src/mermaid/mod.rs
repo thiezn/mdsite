@@ -10,9 +10,6 @@
 //!   `b` (border), `n` (node text), `e` (edge), `el` (edge label),
 //!   `t` (title), plus `i` for italic, so a page can color the art the way
 //!   the original TUI does.
-//! - `wasm_alloc` / `wasm_render_html` / `wasm_result_ptr`: a tiny,
-//!   wasm-bindgen-free FFI surface available when this crate is compiled for
-//!   WebAssembly. Site generation uses the native `render_html` entry point.
 
 mod renderer;
 mod shim;
@@ -81,67 +78,6 @@ fn escape_html(s: &str) -> String {
         }
     }
     out
-}
-
-// ---------------------------------------------------------------------------
-// WASM FFI. Deliberately wasm-bindgen-free so the build needs nothing beyond
-// `cargo build --target wasm32-unknown-unknown`. Protocol:
-//
-//   1. JS calls `wasm_alloc(len)` and writes UTF-8 mermaid source at the
-//      returned pointer.
-//   2. JS calls `wasm_render_html(ptr, len, max_width)` (which frees that
-//      input buffer); it returns the byte length of the rendered HTML.
-//   3. JS reads that many bytes from `wasm_result_ptr()` and UTF-8 decodes.
-//
-// `max_width <= 0` means unlimited. Blank input renders to an empty string.
-// ---------------------------------------------------------------------------
-
-thread_local! {
-    static RESULT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
-}
-
-fn buf_layout(len: usize) -> Layout {
-    Layout::from_size_align(len.max(1), 1).unwrap()
-}
-
-/// Allocate `len` bytes for passing input in. Ownership passes to the caller;
-/// `wasm_render_html` takes it back and frees it.
-#[unsafe(no_mangle)]
-pub extern "C" fn wasm_alloc(len: usize) -> *mut u8 {
-    // SAFETY: buf_layout never has zero size.
-    unsafe { std::alloc::alloc(buf_layout(len)) }
-}
-
-/// Render the UTF-8 mermaid source at `ptr..ptr+len` (a buffer obtained from
-/// `wasm_alloc(len)`, freed by this call) and return the byte length of the
-/// resulting HTML, readable at `wasm_result_ptr()`.
-///
-/// # Safety
-/// `ptr` must come from `wasm_alloc(len)` with this exact `len`, fully
-/// initialized, and must not be used again after this call.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn wasm_render_html(ptr: *mut u8, len: usize, max_width: i32) -> usize {
-    // SAFETY: caller contract — ptr came from wasm_alloc(len), is initialized,
-    // and is not reused after this call.
-    let src = unsafe {
-        let src = String::from_utf8_lossy(std::slice::from_raw_parts(ptr, len)).into_owned();
-        std::alloc::dealloc(ptr, buf_layout(len));
-        src
-    };
-    let max_width = usize::try_from(max_width).ok().filter(|&w| w > 0);
-    let html = render_html(&src, max_width).unwrap_or_default();
-    RESULT.with(|r| {
-        let mut r = r.borrow_mut();
-        *r = html.into_bytes();
-        r.len()
-    })
-}
-
-/// Pointer to the result of the most recent `wasm_render_html` call. Only
-/// valid until the next call.
-#[unsafe(no_mangle)]
-pub extern "C" fn wasm_result_ptr() -> *const u8 {
-    RESULT.with(|r| r.borrow().as_ptr())
 }
 
 #[cfg(test)]
