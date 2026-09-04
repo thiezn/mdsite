@@ -177,7 +177,7 @@ pub fn title_from_path(rel: &std::path::Path) -> String {
         .replace('_', " ")
 }
 
-fn escape_text(s: &str) -> String {
+pub(crate) fn escape_text(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")

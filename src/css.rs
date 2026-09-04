@@ -78,6 +78,30 @@ main a { color: var(--link); }
 .page-dates { margin-left: auto; text-align: right; }
 main ul, main ol { padding-left: 1.5rem; }
 main li { margin: 0.25em 0; }
+.directory-list {
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+.directory-entry {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.directory-description {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.directory-date {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: right;
+}
 main code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9em;

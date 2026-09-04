@@ -277,18 +277,39 @@ fn generate_directory_pages(
         }
 
         let title = folder_name.replace('_', " ");
-        let mut markdown = format!("# {title}\n");
+        let mut markdown = format!("# {title}\n\n<ul class=\"directory-list\">\n");
         for file in direct_files {
             let filename = file
                 .relative
                 .file_stem()
                 .and_then(|name| name.to_str())
                 .unwrap_or("page");
+            let metadata = page_metadata(file)?;
+            let description = metadata
+                .description
+                .map_or_else(String::new, |description| {
+                    format!(
+                        "<p class=\"directory-description\">{}</p>",
+                        html::escape_text(&description)
+                    )
+                });
+            let date = metadata
+                .last_updated_at
+                .as_ref()
+                .or(metadata.publish_date.as_ref())
+                .map_or_else(String::new, |date| {
+                    format!(
+                        "<time class=\"directory-date\" datetime=\"{}\">{}</time>",
+                        date.to_rfc3339_opts(SecondsFormat::Secs, true),
+                        date.format("%d-%m-%Y")
+                    )
+                });
             markdown.push_str(&format!(
-                "\n- [{filename}]({}/{filename}.html)\n",
-                directory.display()
+                "<li class=\"directory-entry\"><div><a href=\"{}/{filename}.html\">{filename}</a>{description}</div>{date}</li>\n",
+                directory.display(),
             ));
         }
+        markdown.push_str("</ul>\n");
 
         let html_rel = directory.with_extension("html");
         let body = markdown_to_html(&markdown);
@@ -623,7 +644,8 @@ mod tests {
 
         let llms_full = fs::read_to_string(output.path().join("llms-full.txt")).unwrap();
         assert!(llms_full.contains("# Home\n\nWelcome home."));
-        assert!(llms_full.contains("# guides\n\n- [hidden](guides/hidden.html)"));
+        assert!(llms_full.contains("# guides\n\n<ul class=\"directory-list\">"));
+        assert!(llms_full.contains("href=\"guides/hidden.html\">hidden</a>"));
         assert!(llms_full.contains("# Start\n\nGet started."));
         let home = fs::read_to_string(output.path().join("index.html")).unwrap();
         assert!(home.contains("<html lang=\"en\">"));
@@ -778,10 +800,14 @@ mod tests {
         fs::create_dir_all(input.path().join("custom")).unwrap();
         fs::write(
             input.path().join("project_notes/guide.md"),
-            "---\ntitle: Getting started\n---\nThis is the guide.\n",
+            "---\ntitle: Getting started\ndescription: A practical introduction.\npublish_date: 2026-01-02\nlast_updated_at: 2026-03-04\n---\nThis is the guide.\n",
         )
         .unwrap();
-        fs::write(input.path().join("project_notes/faq.md"), "Questions.\n").unwrap();
+        fs::write(
+            input.path().join("project_notes/faq.md"),
+            "---\npublish_date: 2026-02-03\n---\nQuestions.\n",
+        )
+        .unwrap();
         fs::write(input.path().join("custom/item.md"), "Custom item.\n").unwrap();
         fs::write(input.path().join("custom.md"), "# Custom landing page\n").unwrap();
         write_config(input.path());
@@ -808,12 +834,23 @@ mod tests {
         assert!(directory_page.contains("<h1>project notes</h1>"));
         assert!(directory_page.contains("href=\"project_notes/guide.html\""));
         assert!(directory_page.contains("href=\"project_notes/faq.html\""));
+        assert!(directory_page.contains("<ul class=\"directory-list\">"));
+        assert!(
+            directory_page
+                .contains("<p class=\"directory-description\">A practical introduction.</p>")
+        );
+        assert!(directory_page.contains(
+            "<time class=\"directory-date\" datetime=\"2026-03-04T00:00:00Z\">04-03-2026</time>"
+        ));
+        assert!(directory_page.contains(
+            "<time class=\"directory-date\" datetime=\"2026-02-03T00:00:00Z\">03-02-2026</time>"
+        ));
         assert!(directory_page.contains("href=\"index.html\">home</a>"));
         assert!(directory_page.contains("<span aria-current=\"page\">project notes</span>"));
-        assert_eq!(
-            fs::read_to_string(output.path().join("project_notes.md")).unwrap(),
-            "# project notes\n\n- [faq](project_notes/faq.html)\n\n- [guide](project_notes/guide.html)\n"
-        );
+        let directory_markdown =
+            fs::read_to_string(output.path().join("project_notes.md")).unwrap();
+        assert!(directory_markdown.contains("<ul class=\"directory-list\">"));
+        assert!(!directory_markdown.contains("\n- ["));
         let guide = fs::read_to_string(output.path().join("project_notes/guide.html")).unwrap();
         assert!(guide.contains(
             "rel=\"alternate\" type=\"text/markdown\" href=\"../project_notes/guide.md\""
