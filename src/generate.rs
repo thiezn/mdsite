@@ -87,7 +87,7 @@ fn convert_file(file: &MdFile, output_root: &Path) -> Result<()> {
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("source.md");
-    let page = html::render_page(&title, &body, &css_hrefs, md_href);
+    let page = html::render_page(&title, &body, &css_hrefs, md_href, &file.relative);
 
     let html_path = output_root.join(&html_rel);
     fs::write(&html_path, page)?;
@@ -133,13 +133,15 @@ mod tests {
 
         let index = fs::read_to_string(output.path().join("index.html")).unwrap();
         assert!(index.contains("href=\"style.css\""));
-        assert!(index.contains("Markdown source"));
+        assert!(index.contains(">markdown</a>"));
         assert!(index.contains("href=\"index.md\""));
         assert!(index.contains("<em>site</em>"));
 
         let nested = fs::read_to_string(output.path().join("nested/page.html")).unwrap();
         assert!(nested.contains("href=\"../style.css\""));
         assert!(nested.contains("href=\"page.md\""));
+        assert!(nested.contains("href=\"../index.html\">home</a>"));
+        assert!(nested.contains("<span>nested</span>"));
     }
 
     #[test]

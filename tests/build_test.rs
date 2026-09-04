@@ -24,7 +24,7 @@ fn cli_build_fixtures() {
     assert!(status.success());
 
     let index = fs::read_to_string(output.path().join("index.html")).unwrap();
-    assert!(index.contains("Markdown source"));
+    assert!(index.contains(">markdown</a>"));
     assert!(index.contains("href=\"index.md\""));
     assert!(index.contains("href=\"style.css\""));
     assert!(output.path().join("index.md").is_file());
@@ -33,4 +33,6 @@ fn cli_build_fixtures() {
     let nested = fs::read_to_string(output.path().join("nested/guide.html")).unwrap();
     assert!(nested.contains("href=\"../style.css\""));
     assert!(nested.contains("href=\"guide.md\""));
+    assert!(nested.contains("href=\"../index.html\">home</a>"));
+    assert!(nested.contains("<span>nested</span>"));
 }

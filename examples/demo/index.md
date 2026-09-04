@@ -12,7 +12,9 @@ Hello **bold**, *italic*, and `inline code`.
 1. ordered one
 2. ordered two
 
-A [link](nested/guide.html) to a nested page.
+A [link](nested_same_level.html) to a nested page.
+
+A [link](nested/guide.html) to a nested page within a folder
 
 ## Code
 

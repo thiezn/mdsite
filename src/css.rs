@@ -32,9 +32,12 @@ body {
   background: var(--bg);
 }
 header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.125rem 0;
 }
 header a {
   color: var(--muted);
@@ -42,6 +45,17 @@ header a {
   text-decoration: none;
 }
 header a:hover { text-decoration: underline; }
+.breadcrumbs {
+  display: flex;
+  min-width: 0;
+  gap: 0.4rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.breadcrumb-separator { color: var(--border); }
+.markdown-source { flex: none; }
 main h1, main h2, main h3, main h4, main h5, main h6 {
   line-height: 1.25;
   margin-top: 1.5em;

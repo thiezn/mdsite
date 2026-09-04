@@ -6,7 +6,7 @@ Minimal static site generator: Markdown in, clean HTML out.
 
 - Walk an input directory of `.md` files (relative folder structure preserved)
 - Emit matching `.html` pages with minimal semantic HTML
-- Copy each `.md` next to its `.html`, with a Markdown source link on every page
+- Copy each `.md` next to its `.html`, with a `markdown` source link and breadcrumb navigation on every page
 - Shared `style.css` at the output root (correct relative paths from nested pages)
 - Basic Markdown: headings, paragraphs, emphasis, strong, links, lists, inline code, fenced code blocks
 - Mermaid: fenced Mermaid code blocks are rendered as styled, accessible HTML with the built-in Rust renderer
