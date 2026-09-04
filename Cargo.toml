@@ -1,6 +1,6 @@
 [package]
 name = "mdsite"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 description = "Minimal static site generator from Markdown"
 license = "APACHE-2.0"
@@ -17,6 +17,7 @@ unicode-width = "0"
 syntect = { version = "5", default-features = false, features = [
     "default-fancy",
 ] }
+toml = "0"
 
 [dev-dependencies]
 tempfile = "3"

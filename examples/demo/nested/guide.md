@@ -1,4 +1,11 @@
-# Nested guide
+---
+title: "Nested guide"
+description: "Examples of diagrams and nested-page navigation"
+language: en
+publish_date: 2026-09-02
+include_in_rss: false
+---
+
 
 Relative CSS and the Markdown source link should still work from this folder.
 

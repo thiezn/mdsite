@@ -63,6 +63,13 @@ main h1, main h2, main h3, main h4, main h5, main h6 {
 main > h1:first-child { margin-top: 0; }
 main p { margin: 0.75em 0; }
 main a { color: var(--link); }
+.page-metadata {
+  margin-top: 2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: right;
+}
 main ul, main ol { padding-left: 1.5rem; }
 main li { margin: 0.25em 0; }
 main code {

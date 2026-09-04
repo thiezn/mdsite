@@ -14,9 +14,6 @@
 mod renderer;
 mod shim;
 
-use std::alloc::Layout;
-use std::cell::RefCell;
-
 use renderer::MermaidStyles;
 use shim::Style;
 
@@ -33,6 +30,7 @@ fn styles() -> MermaidStyles {
 /// Render mermaid source to plain (uncolored) box-drawing text, or `None`
 /// for blank input. `max_width` bounds the diagram width in display columns;
 /// diagrams that cannot fit fall back to the framed raw source.
+#[allow(dead_code)]
 pub fn render_plain(src: &str, max_width: Option<usize>) -> Option<String> {
     renderer::render(src, &styles(), max_width).map(|art| art.plain_lines.join("\n"))
 }

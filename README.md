@@ -8,6 +8,8 @@ Minimal static site generator: Markdown in, clean HTML out.
 - Emit matching `.html` pages with minimal semantic HTML
 - Copy each `.md` next to its `.html`, with a `markdown` source link and breadcrumb navigation on every page
 - Shared `style.css` at the output root (correct relative paths from nested pages)
+- Generate `sitemap.xml`, `llms.txt`, and `llms-full.txt` at the output root
+- Generate `rss.xml` from opted-in Markdown pages
 - Basic Markdown: headings, paragraphs, emphasis, strong, links, lists, inline code, fenced code blocks
 - Mermaid: fenced Mermaid code blocks are rendered as styled, accessible HTML with the built-in Rust renderer
 
@@ -21,6 +23,46 @@ cargo install --path .
 
 ```bash
 mdsite build --input ./content --output ./site
+```
+
+## Site Configuration
+
+An optional `mdsite.toml` at the input root configures generated site metadata.
+It is not copied into the output directory. Set `[default].domain` to generate
+absolute sitemap URLs; a domain without a scheme uses `https://`. The optional
+`[llms].prefix` is inserted above the Markdown page links in `llms.txt`.
+
+```toml
+[default]
+domain = "example.com"
+
+[llms]
+prefix = "# Example documentation"
+```
+
+Every build writes `llms.txt` and `llms-full.txt`. A configured domain also
+populates `sitemap.xml` with every generated HTML page and the appropriate page
+date. `rss.xml` is generated on every build and uses the configured domain for
+page URLs.
+
+## Page Frontmatter
+
+Pages may start with frontmatter. `description` is emitted as an HTML metadata
+description and used in RSS; `language` sets the page HTML language and RSS item
+language. `publish_date` and `last_updated_at` use `YYYY-MM-DD` and appear at
+the bottom-right of the page. The sitemap uses `last_updated_at`, then
+`publish_date`, then the build date. Both inclusion flags default to `true`.
+
+```markdown
+---
+title: "Example page"
+description: "A concise page summary"
+language: en
+publish_date: 2026-09-01
+last_updated_at: 2026-09-04
+include_in_rss: true
+include_in_sitemap: true
+---
 ```
 
 Library API:

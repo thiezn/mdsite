@@ -1,0 +1,9 @@
+[default]
+domain = "example.com"
+
+[llms]
+prefix = """# Welcome to example.com.
+
+The following links point to every page on the site in markdown format:
+
+"""

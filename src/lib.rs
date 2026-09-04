@@ -9,6 +9,7 @@ mod generate;
 mod html;
 mod markdown;
 mod mermaid;
+mod rss;
 mod syntax;
 mod walk;
 

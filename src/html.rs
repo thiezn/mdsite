@@ -7,8 +7,16 @@ pub fn render_page(
     css_hrefs: &[String],
     md_href: Option<&str>,
     page_rel: &std::path::Path,
+    description: Option<&str>,
+    language: Option<&str>,
+    publish_date: Option<&str>,
+    last_updated_at: Option<&str>,
 ) -> String {
     let title_esc = escape_text(title);
+    let language = language.unwrap_or("en");
+    let description = description.map_or_else(String::new, |description| {
+        format!("<meta name=\"description\" content=\"{}\">", escape_text(description))
+    });
     let stylesheets: String = css_hrefs
         .iter()
         .map(|href| format!("<link rel=\"stylesheet\" href=\"{}\">", escape_text(href)))
@@ -35,13 +43,15 @@ pub fn render_page(
             escape_text(href)
         )
     });
+    let page_metadata = page_metadata_html(publish_date, last_updated_at);
     format!(
         r##"<!DOCTYPE html>
-<html lang="en">
+<html lang="{language}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
+{description}
 {stylesheets}
 {markdown_alternate}
 </head>
@@ -53,16 +63,35 @@ pub fn render_page(
 <main>
 {body}
 </main>
+{page_metadata}
 </body>
 </html>
 "##,
         title = title_esc,
+        language = escape_text(language),
+        description = description,
         stylesheets = stylesheets,
         markdown_alternate = markdown_alternate,
         breadcrumbs = breadcrumbs,
         markdown_source = markdown_source,
         body = body_html,
+        page_metadata = page_metadata,
     )
+}
+
+fn page_metadata_html(publish_date: Option<&str>, last_updated_at: Option<&str>) -> String {
+    let mut dates = Vec::new();
+    if let Some(date) = publish_date {
+        dates.push(format!("Published <time datetime=\"{0}\">{0}</time>", escape_text(date)));
+    }
+    if let Some(date) = last_updated_at {
+        dates.push(format!("Updated <time datetime=\"{0}\">{0}</time>", escape_text(date)));
+    }
+    if dates.is_empty() {
+        String::new()
+    } else {
+        format!("<footer class=\"page-metadata\">{}</footer>", dates.join("<br>"))
+    }
 }
 
 fn breadcrumb_html(page_rel: &std::path::Path) -> String {
@@ -133,6 +162,10 @@ mod tests {
             &["../style.css".to_string(), "../syntax-rust.css".to_string()],
             Some("hello.md"),
             Path::new("docs/hello.md"),
+            Some("A short description"),
+            Some("nl"),
+            Some("2026-01-02"),
+            Some("2026-03-04"),
         );
         assert!(html.contains("href=\"../style.css\""));
         assert!(html.contains("href=\"../syntax-rust.css\""));
@@ -146,6 +179,10 @@ mod tests {
         assert!(html.contains("<span aria-current=\"page\">hello</span>"));
         assert!(html.contains("<main>"));
         assert!(html.contains("<p>Hi</p>"));
+        assert!(html.contains("<html lang=\"nl\">"));
+        assert!(html.contains("<meta name=\"description\" content=\"A short description\">"));
+        assert!(html.contains("<footer class=\"page-metadata\">"));
+        assert!(html.contains("Published <time datetime=\"2026-01-02\">2026-01-02</time>"));
     }
 
     #[test]
