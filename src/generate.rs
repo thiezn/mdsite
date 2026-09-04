@@ -351,7 +351,7 @@ fn generate_site_metadata(
     let date = generation_date()?;
     if config.generate_sitemap {
         let mut sitemap = String::from(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://sitemaps.org\">\n",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
         );
         for markdown_page in &markdown_pages {
             let metadata = source_metadata.get(markdown_page);
