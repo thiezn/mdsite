@@ -85,19 +85,9 @@ mdsite::build(input_dir, output_dir)?;
 
 Demo content lives in `examples/demo/`.
 
-## CI and GitHub Pages
+## Publishing on GitHub Pages
 
-Workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml):
-
-1. `cargo test`
-2. `cargo build --release`
-3. Generate `examples/demo` into `_site`
-4. Upload the site as a workflow artifact (every PR/push)
-5. On `main` (or `workflow_dispatch`), deploy `_site` to GitHub Pages
-
-One-time repo setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-
-After the first successful deploy from `main`, the site is at `https://thiezn.github.io/mdsite/`.
+Have a look at the [repo](https://github.com/thiezn/mortimer.nl) for an example on how to publish the page to GitHub Pages. Make sure to follow GitHub's documentation and set the output folder to docs/ as described [here](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#about-publishing-sources)
 
 ## Development
 
