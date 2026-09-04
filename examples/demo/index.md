@@ -24,6 +24,10 @@ A [link](nested/guide.html) to a nested page within a folder
 
 A [link](nested_with_index/nested.html) to a nested page within a folder
 
+## Some image
+
+![Some image](test.png)
+
 ## Code
 
 ```rust

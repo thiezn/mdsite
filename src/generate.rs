@@ -7,7 +7,7 @@ use crate::html;
 use crate::markdown::{extract_code_blocks, markdown_to_html};
 use crate::mermaid;
 use crate::syntax;
-use crate::walk::{MdFile, collect_markdown_files};
+use crate::walk::{MdFile, collect_asset_files, collect_markdown_files};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -17,6 +17,7 @@ use std::path::Path;
 /// For each `.md` file:
 /// - emit a matching `.html` page (folder structure preserved),
 /// - copy the `.md` next to the `.html`,
+/// - copy all non-Markdown files unchanged (folder structure preserved),
 /// - render Mermaid fences as styled HTML diagrams,
 /// - render other fenced blocks with syntax-specific stylesheets.
 ///
@@ -27,9 +28,16 @@ pub fn build(input: &Path, output: &Path) -> Result<()> {
         fs::remove_dir_all(output)?;
     }
     fs::create_dir_all(output)?;
-    fs::write(output.join("style.css"), STYLE_CSS)?;
 
     let files = collect_markdown_files(input)?;
+    for asset in collect_asset_files(input)? {
+        let destination = output.join(&asset.relative);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(asset.absolute, destination)?;
+    }
+    fs::write(output.join("style.css"), STYLE_CSS)?;
     let mut syntax_stylesheets = BTreeSet::new();
     for file in &files {
         let markdown = fs::read_to_string(&file.absolute)?;
@@ -238,6 +246,27 @@ mod tests {
         assert!(output.path().join("style.css").is_file());
         assert!(!output.path().join("old.html").exists());
         assert!(!output.path().join("old").exists());
+    }
+
+    #[test]
+    fn build_copies_non_markdown_files_preserving_paths_and_contents() {
+        let input = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        fs::create_dir_all(input.path().join("images/icons")).unwrap();
+        fs::write(input.path().join("index.md"), "# Home\n").unwrap();
+        fs::write(input.path().join("robots.txt"), "User-agent: *\n").unwrap();
+        fs::write(input.path().join("images/icons/logo.png"), [0, 1, 2, 255]).unwrap();
+
+        build(input.path(), output.path()).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(output.path().join("robots.txt")).unwrap(),
+            "User-agent: *\n"
+        );
+        assert_eq!(
+            fs::read(output.path().join("images/icons/logo.png")).unwrap(),
+            [0, 1, 2, 255]
+        );
     }
 
     #[test]
