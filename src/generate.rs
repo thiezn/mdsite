@@ -254,7 +254,9 @@ fn generate_directory_pages(files: &[MdFile], output_root: &Path) -> Result<Vec<
         let css_hrefs = [css::relative_css_href(&html_rel)];
         let md_rel = directory.with_extension("md");
         let md_href = md_rel.file_name().and_then(|name| name.to_str());
-        let page = html::render_page(&title, &body, &css_hrefs, md_href, &html_rel, None, None, None, None);
+        let page = html::render_page(
+            &title, &body, &css_hrefs, md_href, &html_rel, None, None, None, None,
+        );
         fs::write(output_root.join(html_rel), page)?;
         fs::write(output_root.join(md_rel), markdown)?;
         generated_pages.push(directory.with_extension("md"));
@@ -289,7 +291,9 @@ fn generate_site_metadata(
     markdown_pages.sort();
 
     let date = generation_date()?;
-    let mut sitemap = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://sitemaps.org\">\n");
+    let mut sitemap = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://sitemaps.org\">\n",
+    );
     if !config.domain.is_empty() {
         for markdown_page in &markdown_pages {
             let metadata = source_metadata.get(markdown_page);
@@ -363,7 +367,11 @@ fn generate_site_metadata(
                 language: metadata.language.as_deref(),
                 link: page_url(
                     &config.domain,
-                    &file.relative.with_extension("html").to_string_lossy().replace('\\', "/"),
+                    &file
+                        .relative
+                        .with_extension("html")
+                        .to_string_lossy()
+                        .replace('\\', "/"),
                 ),
                 publish_date: metadata.publish_date.as_deref(),
                 last_updated_at: metadata.last_updated_at.as_deref(),
@@ -426,7 +434,8 @@ fn civil_date_from_days(days_since_epoch: i64) -> (i64, u32, u32) {
         adjusted_days - 146_096
     } / 146_097;
     let day_of_era = adjusted_days - era * 146_097;
-    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
     let year = year_of_era + era * 400;
     let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let month_parameter = (5 * day_of_year + 2) / 153;

@@ -15,7 +15,10 @@ pub fn render_page(
     let title_esc = escape_text(title);
     let language = language.unwrap_or("en");
     let description = description.map_or_else(String::new, |description| {
-        format!("<meta name=\"description\" content=\"{}\">", escape_text(description))
+        format!(
+            "<meta name=\"description\" content=\"{}\">",
+            escape_text(description)
+        )
     });
     let stylesheets: String = css_hrefs
         .iter()
@@ -82,15 +85,24 @@ pub fn render_page(
 fn page_metadata_html(publish_date: Option<&str>, last_updated_at: Option<&str>) -> String {
     let mut dates = Vec::new();
     if let Some(date) = publish_date {
-        dates.push(format!("Published <time datetime=\"{0}\">{0}</time>", escape_text(date)));
+        dates.push(format!(
+            "published <time datetime=\"{0}\">{0}</time>",
+            escape_text(date)
+        ));
     }
     if let Some(date) = last_updated_at {
-        dates.push(format!("Updated <time datetime=\"{0}\">{0}</time>", escape_text(date)));
+        dates.push(format!(
+            "updated <time datetime=\"{0}\">{0}</time>",
+            escape_text(date)
+        ));
     }
     if dates.is_empty() {
         String::new()
     } else {
-        format!("<footer class=\"page-metadata\">{}</footer>", dates.join("<br>"))
+        format!(
+            "<footer class=\"page-metadata\">{}</footer>",
+            dates.join("<br>")
+        )
     }
 }
 
