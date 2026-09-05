@@ -1,6 +1,6 @@
 [package]
 name = "mdsite"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 description = "Minimal static site generator from Markdown"
 license = "APACHE-2.0"
